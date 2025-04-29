@@ -1,21 +1,16 @@
 """Module for audio analysis endpoint."""
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, File, UploadFile
+
+from app.main import ia_service
+from services.s3 import upload_audio
 
 router = APIRouter()
 
 
 @router.post("/analyze")
 async def analyze_audio(file: UploadFile = File(...)):
-    if not file.filename.endswith((".mp3", ".wav", ".m4a")):
-        raise HTTPException(status_code=400, detail="Invalid file type")
-
-    analysis_result = {
-        "filename": file.filename,
-        "status": "analyzed",
-        "tone": "neutral",
-        "message": "Mock analysis complete",
-    }
-
-    return JSONResponse(content=analysis_result)
+    filename = file.filename
+    audio_url = upload_audio(file, filename)
+    result = await ia_service.analyze_audio(audio_url)
+    return result
