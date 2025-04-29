@@ -1,6 +1,6 @@
 """Mock Assembly Service for testing purposes."""
 
-from services.assembly.base import AssemblyBase
+from app.services.assembly.base import AssemblyBase
 
 
 class MockAssemblyService(AssemblyBase):

@@ -2,7 +2,7 @@
 
 import httpx
 
-from services.assembly.base import AssemblyBase
+from app.services.assembly.base import AssemblyBase
 
 
 class AssemblyService(AssemblyBase):

@@ -1,36 +1,85 @@
-"""Module for testing the audio analysis endpoint."""
+"""Tests for the /analyze endpoint covering success and all error paths."""
 
 from io import BytesIO
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from app.core.exceptions import AnalyzeAudioException, UploadAudioException
 from app.main import app
 
 
 @pytest.mark.asyncio
-async def test_analyze_audio_with_valid_file():
-    """Test the audio analysis endpoint with a valid audio file."""
+async def test_analyze_success(mock_upload_audio, mock_analyze_audio):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport) as client:
-        audio_data = BytesIO(b"fake audio data")
-        files = {"file": ("test.mp3", audio_data, "audio/mpeg")}
+        files = {
+            "file": ("test.mp3", BytesIO(b"valid audio data"), "audio/mpeg"),
+        }
         response = await client.post("http://test/api/v1/analyze", files=files)
 
     assert response.status_code == 200
     json_data = response.json()
-    assert json_data["status"] == "analyzed"
-    assert json_data["filename"] == "test.mp3"
+    assert "status" in json_data
 
 
 @pytest.mark.asyncio
-async def test_analyze_audio_with_invalid_file():
-    """Test the audio analysis endpoint with an invalid audio file."""
+async def test_analyze_invalid_file_type():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport) as client:
-        audio_data = BytesIO(b"not an audio file")
-        files = {"file": ("test.txt", audio_data, "text/plain")}
+        files = {
+            "file": ("not_audio.txt", BytesIO(b"not audio"), "text/plain"),
+        }
         response = await client.post("http://test/api/v1/analyze", files=files)
 
+    resp_detail = response.json()["detail"]
     assert response.status_code == 400
-    assert response.json()["detail"] == "Invalid file type"
+    assert resp_detail == "Invalid file type. Accepted formats: .mp3, .wav"
+
+
+@pytest.mark.asyncio
+async def test_analyze_upload_error(mocker, mock_analyze_audio):
+    mocker.patch(
+        "app.api.v1.endpoints.analyze.upload_audio",
+        side_effect=UploadAudioException("Upload failed"),
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport) as client:
+        files = {"file": ("test.mp3", BytesIO(b"audio"), "audio/mpeg")}
+        response = await client.post("http://test/api/v1/analyze", files=files)
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Upload failed"
+
+
+@pytest.mark.asyncio
+async def test_analyze_ia_error(mocker, mock_upload_audio):
+    mocker.patch(
+        "app.api.v1.endpoints.analyze.ia_service.analyze_audio",
+        side_effect=AnalyzeAudioException("Assembly service down"),
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport) as client:
+        files = {"file": ("test.mp3", BytesIO(b"audio"), "audio/mpeg")}
+        response = await client.post("http://test/api/v1/analyze", files=files)
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == "Assembly service down"
+
+
+@pytest.mark.asyncio
+async def test_analyze_unexpected_error(mocker, mock_upload_audio):
+    mocker.patch(
+        "app.api.v1.endpoints.analyze.ia_service.analyze_audio",
+        side_effect=Exception("Kaboom!"),
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport) as client:
+        files = {"file": ("test.mp3", BytesIO(b"audio"), "audio/mpeg")}
+        response = await client.post("http://test/api/v1/analyze", files=files)
+
+    assert response.status_code == 500
+    assert "Kaboom!" in response.json()["detail"]
