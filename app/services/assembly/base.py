@@ -1,6 +1,10 @@
-"""Module for AssemblyAI base class."""
+"""Module for AssemblyBase class."""
+
+from abc import ABC, abstractmethod
 
 
-class AssemblyBase:
+class AssemblyBase(ABC):
+    @abstractmethod
     async def analyze_audio(self, audio_url: str) -> dict:
-        raise NotImplementedError
+        """Analyze audio and return transcript/summary."""
+        pass

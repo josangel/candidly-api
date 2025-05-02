@@ -1,15 +1,23 @@
 """Module for AssemblyAI service in production environment."""
 
-import httpx
+import assemblyai as aai
 
-from app.services.assembly.base import AssemblyBase
+from app.core.config import settings
+
+from .base import AssemblyBase
 
 
-class AssemblyService(AssemblyBase):
+class RealAssemblyService(AssemblyBase):
+
     async def analyze_audio(self, audio_url: str) -> dict:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                url="https://api.assemblyai.com/v2/analyze",
-                json={"audio_url": audio_url},
-            )
-            return resp.json()
+        aai.settings.api_key = settings.assemblyai_api_key
+        transcriber = aai.Transcriber(
+            config=aai.TranscriptionConfig(sentiment_analysis=True)
+        )
+        transcript = transcriber.transcribe(audio_url)
+        acoustic_analysis = transcript.get("acoustic_analysis", {})
+        return {
+            "transcript": transcript.text,
+            "summary": transcript.get("summary", ""),
+            "tone": acoustic_analysis.get("overall", "unknown"),
+        }
