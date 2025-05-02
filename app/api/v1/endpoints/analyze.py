@@ -1,13 +1,13 @@
 import shutil
-import tempfile
-from uuid import uuid4
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.audio_analysis import AnalysisStatus, AudioAnalysis
-from app.db.session import AsyncSessionLocal
-from app.tasks.audio import upload_audio_to_s3_task
+from app.db.session import AsyncSessionLocal, get_db
+from app.schemas.audio_analysis import AudioAnalysisOut
+from app.tasks.upload_audio import upload_audio_to_s3_task
 
 router = APIRouter()
 
@@ -20,13 +20,11 @@ async def analyze_audio(file: UploadFile = File(...)):
             detail="Invalid file type",
         )
 
-    # Guardar archivo en tmp local para pasarlo a la tarea
-    temp_dir = tempfile.mkdtemp()
+    temp_dir = "/tmp/audio"
     file_path = f"{temp_dir}/{file.filename}"
     with open(file_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    # Crear registro en la base de datos
     session: AsyncSession = AsyncSessionLocal()
     analysis_id = str(uuid4())
     audio = AudioAnalysis(
@@ -38,7 +36,17 @@ async def analyze_audio(file: UploadFile = File(...)):
     session.add(audio)
     await session.commit()
 
-    # Encolar tarea
     upload_audio_to_s3_task.delay(analysis_id, file_path)
 
     return {"id": analysis_id, "status": "processing"}
+
+
+@router.get("/analyze/{analysis_id}", response_model=AudioAnalysisOut)
+async def get_audio_analysis(
+    analysis_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    analysis = await db.get(AudioAnalysis, str(analysis_id))
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    return analysis

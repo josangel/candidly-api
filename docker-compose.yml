@@ -4,10 +4,13 @@ services:
     container_name: candidly-api
     ports:
       - "8000:8000"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
     env_file:
       - .env.local
     volumes:
       - .:/app
+      - tmp_files:/tmp/audio
     depends_on:
       - db
       - redis
@@ -17,10 +20,13 @@ services:
     build: .
     container_name: candidly-worker
     command: celery -A app.worker worker --loglevel=info
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
     env_file:
       - .env.local
     volumes:
       - .:/app
+      - tmp_files:/tmp/audio
     depends_on:
       - redis
       - db
@@ -60,3 +66,4 @@ services:
 volumes:
   candidly_db_data:
   minio_data:
+  tmp_files:
