@@ -7,12 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models.audio_analysis import AnalysisStatus, AudioAnalysis
 from app.db.session import AsyncSessionLocal, get_db
 from app.schemas.audio_analysis import AudioAnalysisOut
+from app.tasks.process_audio import process_audio_task
 from app.tasks.upload_audio import upload_audio_to_s3_task
 
 router = APIRouter()
 
 
-@router.post("/analyze")
+@router.post("/analyze", status_code=201)
 async def analyze_audio(file: UploadFile = File(...)):
     if not file.content_type.startswith("audio/"):
         raise HTTPException(
@@ -25,18 +26,19 @@ async def analyze_audio(file: UploadFile = File(...)):
     with open(file_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    session: AsyncSession = AsyncSessionLocal()
     analysis_id = str(uuid4())
-    audio = AudioAnalysis(
-        id=analysis_id,
-        filename=file.filename,
-        audio_url="pending",
-        status=AnalysisStatus.processing,
-    )
-    session.add(audio)
-    await session.commit()
+    async with AsyncSessionLocal() as session:
+        audio = AudioAnalysis(
+            id=analysis_id,
+            filename=file.filename,
+            audio_url="pending",
+            status=AnalysisStatus.processing,
+        )
+        session.add(audio)
+        await session.commit()
 
     upload_audio_to_s3_task.delay(analysis_id, file_path)
+    process_audio_task.delay(analysis_id, file_path)
 
     return {"id": analysis_id, "status": "processing"}
 

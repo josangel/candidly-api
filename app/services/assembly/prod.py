@@ -15,9 +15,9 @@ class RealAssemblyService(AssemblyBase):
             config=aai.TranscriptionConfig(sentiment_analysis=True)
         )
         transcript = transcriber.transcribe(audio_url)
-        acoustic_analysis = transcript.get("acoustic_analysis", {})
-        return {
+
+        result = {
             "transcript": transcript.text,
-            "summary": transcript.get("summary", ""),
-            "tone": acoustic_analysis.get("overall", "unknown"),
         }
+
+        return result

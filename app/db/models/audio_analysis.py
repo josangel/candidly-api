@@ -3,7 +3,7 @@
 import enum
 from uuid import uuid4
 
-from sqlalchemy import Column, DateTime, Enum, String, Text
+from sqlalchemy import JSON, Column, DateTime, Enum, String, Text
 from sqlalchemy.sql import func
 
 from app.db.base import Base
@@ -24,7 +24,7 @@ class AudioAnalysis(Base):
     status = Column(Enum(AnalysisStatus), default=AnalysisStatus.processing)
 
     transcript_text = Column(Text, nullable=True)
-    summary = Column(Text, nullable=True)
+    assembly_response = Column(JSON, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

@@ -47,8 +47,6 @@ services:
       POSTGRES_USER: candidly
       POSTGRES_PASSWORD: candidly
       POSTGRES_DB: candidly_db
-    volumes:
-      - candidly_db_data:/var/lib/postgresql/data
 
   s3:
     image: minio/minio

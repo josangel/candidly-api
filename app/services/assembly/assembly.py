@@ -11,11 +11,8 @@ transcriber = aai.Transcriber()
 
 async def analyze_audio_from_url(audio_url: str) -> dict:
     try:
-        transcript = transcriber.transcribe(audio_url)
-        return {
-            "status": "analyzed",
-            "text": transcript.text,
-            "summary": transcript.summary,
-        }
+        transcript = await transcriber.transcribe_async(audio_url)
+
+        return transcript
     except Exception as e:
         return {"status": "error", "detail": str(e)}
